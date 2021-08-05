@@ -1,4 +1,4 @@
-name: CI/CD for Side Business
+name: CI/CD for Query Cache Plugin
 
 on:
   push:
