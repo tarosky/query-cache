@@ -20,31 +20,8 @@ class QueryCache extends Singleton {
 	protected $cache_group_base = 'ts_query_cache';
 
 	/**
-	 * @var string Cache key.
-	 * @deprectated
+	 * @var array List of post types not to cache.
 	 */
-	private $CACHE_GROUP_PREFIX = 'advanced_post_cache_';
-
-	// Flag for temp (within one page load) turning invalidations on and off
-	// @see dont_clear_advanced_post_cache()
-	// @see do_clear_advanced_post_cache()
-	// Used to prevent invalidation during new comment
-	var $do_flush_cache = true;
-
-	// Flag for preventing multiple invalidations in a row: clean_post_cache() calls itself recursively for post children.
-	var $need_to_flush_cache = true; // Currently disabled
-
-	/* Per cache-clear data */
-	var $cache_incr = 0; // Increments the cache group (advanced_post_cache_0, advanced_post_cache_1, ...)
-
-	/* Per query data */
-	var $cache_key = ''; // md5 of current SQL query
-	var $all_post_ids = false; // IDs of all posts current SQL query returns
-	var $cached_post_ids = array(); // subset of $all_post_ids whose posts are currently in cache
-	var $cached_posts = array();
-	var $found_posts = false; // The result of the FOUND_ROWS() query
-	var $cache_func = 'wp_cache_add'; // Turns to set if there seems to be inconsistencies
-
 	protected $post_type_not_to_cache = [];
 
 	/**
@@ -117,9 +94,9 @@ class QueryCache extends Singleton {
 			// Filter is not registered.
 			$should_cache = false;
 		} else {
-			$post_types = (array) $wp_query->get( 'post_type' );
+			$post_types             = (array) $wp_query->get( 'post_type' );
 			$post_type_not_to_cache = $this->post_types_no_cache();
-			$filtered   = array_filter( $post_types, function( $post_type ) use ( $post_type_not_to_cache ) {
+			$filtered               = array_filter( $post_types, function( $post_type ) use ( $post_type_not_to_cache ) {
 				return ! in_array( $post_type, $post_type_not_to_cache, true );
 			} );
 			if ( count( $post_types ) !== count( $filtered ) ) {
@@ -179,20 +156,23 @@ class QueryCache extends Singleton {
 			// No cache.
 			$lifetime = $this->cache_time( $wp_query );
 			if ( ! $lifetime ) {
-				// No cache life tiime, returns original.
+				// No cache life time, returns original.
 				return $posts;
 			}
 			switch ( $wp_query->get( 'fields' ) ) {
 				case 'ids':
+					// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 					$posts = $wpdb->get_col( $wp_query->request );
 					break;
 				default:
+					// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 					$posts = $wpdb->get_results( $wp_query->request );
 					break;
 			}
 			// Save results.
 			wp_cache_set( $cache_key, $posts, $this->cache_group, $lifetime );
 			// Save found rows.
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 			$this->save_found_rows( (int) $wpdb->get_var( 'SELECT FOUND_ROWS()' ), $wp_query );
 		}
 
